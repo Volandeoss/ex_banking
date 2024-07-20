@@ -15,15 +15,23 @@ defmodule ExBanking do
 
 
   @spec create_user(user :: String.t()) :: :ok | {:error, :wrong_arguments | :user_already_exists}
-  def create_user(user) do
+  def create_user(user)when is_binary(user) do
     User.start_link(user)
+  end
+
+  def create_user(_) do
+    {:error, :wrong_arguments}
   end
 
   @spec deposit(user :: String.t(), amount :: number, currency :: String.t()) ::
           {:ok, new_balance :: number}
           | {:error, :wrong_arguments | :user_does_not_exist | :too_many_requests_to_user}
+  def deposit(user, amount, currency) when is_float(amount) and is_binary(currency)   do
+    User.deposit(user, amount, currency)
+  end
+
   def deposit(user, amount, currency) do
-    ExBanking.deposit(user, amount, currency)
+    User.deposit(user, amount, currency)
   end
 
   @spec withdraw(user :: String.t(), amount :: number, currency :: String.t()) ::
@@ -59,7 +67,15 @@ defmodule ExBanking do
              | :too_many_requests_to_sender
              | :too_many_requests_to_receiver}
   def send(from_user,to_user, amount, currency) do
-
+    case User.withdraw(from_user, amount, currency) do
+      {:ok, _} ->
+        case User.deposit(to_user, amount, currency) do
+          {:ok, _} ->
+            {:ok, User.show(from_user, currency), User.show(to_user, currency)}
+          error -> error
+        end
+      error -> error
+    end
   end
 
 

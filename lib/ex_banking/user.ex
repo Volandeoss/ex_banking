@@ -18,6 +18,20 @@ defmodule ExBanking.User do
     GenServer.call(via_tuple(user), {:deposit, user, amount, currency})
   end
 
+
+
+  def send(from_user, to_user, amount, currency) do
+    case withdraw(from_user, amount, currency) do
+      {:ok, _} ->
+        case deposit(to_user, amount, currency) do
+          {:ok, _} ->
+            {:ok, show(from_user, currency), show(to_user, currency)}
+          error -> error
+        end
+      error -> error
+    end
+  end
+
   def show(user, currency) do
     GenServer.call(via_tuple(user), {:show, user, currency})
   end
@@ -36,11 +50,12 @@ defmodule ExBanking.User do
     {:reply, {:ok, Map.get(state, currency, 0)}, state}
   end
 
-  #here is bad
-  def handle_call({:withdraw, user, amount, currency}, _from, state) do
-    new_state = Map.get(state,currency, 0) - amount
 
-    {:reply, {:ok, new_state}, state}
+  def handle_call({:withdraw, amount, currency}, _from, state) do
+    new_value = Map.get(state,currency, 0) - amount
+
+
+    {:reply, {:ok, new_value}, Map.put(state, currency, new_value)}
   end
 
   defp via_tuple(user) do
