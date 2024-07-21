@@ -4,42 +4,38 @@ defmodule ExBanking do
   """
   alias ExBanking.User
 
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> ExBanking.hello()
-      :world
-
-  """
-
-  @spec create_user(user :: String.t()) :: :ok | {:error, :wrong_arguments | :user_already_exists}#Done
+  # Done
+  @spec create_user(user :: String.t()) :: :ok | {:error, :wrong_arguments | :user_already_exists}
   def create_user(user) when is_binary(user) do
-    case user?(user) do
-      true -> {:error, :user_already_exists}
-      false -> User.start_child(user)
+    with {:not_binary_user, true} <- {:not_binary_user, is_binary(user)},
+         {:user_already_exists, false} <- {:user_already_exists, user?(user)} do
+      User.start_child(user)
+    else
+      {:not_binary_user, false} -> {:error, :wrong_arguments}
+      {:user_already_exists, true} -> {:error, :user_already_exists}
     end
   end
-
-  def create_user(_), do: {:error, :wrong_arguments}
 
   @spec deposit(user :: String.t(), amount :: number, currency :: String.t()) ::
           {:ok, new_balance :: number}
           | {:error, :wrong_arguments | :user_does_not_exist | :too_many_requests_to_user}
-  def deposit(user, amount, currency)
-      when (is_float(amount) or is_integer(amount)) and (is_binary(currency) and is_binary(user)) do
-    with true <- user?(user),
-    {:ok, result} <- User.deposit(user, amount, currency) do
+  def deposit(user, amount, currency) do
+    with {:not_float_or_int, true} <- {:not_float_or_int, is_float(amount) or is_integer(amount)},
+         {:not_positive_amount, true} <- {:not_positive_amount, amount > 0},
+         {:not_binary_user, true} <- {:not_binary_user, is_binary(user)},
+         {:not_binary_currency, true} <- {:not_binary_currency, is_binary(currency)},
+         {:user_does_not_exist, true} <- {:user_does_not_exist, user?(user)},
+         {:ok, result} <- User.deposit(user, amount, currency) do
       {:ok, result}
     else
-      false -> {:error, :user_does_not_exist}
+      {:not_positive_amount, false} -> {:error, :wrong_arguments}
+      {:not_float_or_int, false} -> {:error, :wrong_arguments}
+      {:not_binary_user, false} -> {:error, :wrong_arguments}
+      {:not_binary_currency, false} -> {:error, :wrong_arguments}
+      {:user_does_not_exist, false} -> {:error, :user_does_not_exist}
       {:error, reason} -> {:error, reason}
     end
-
   end
-
-  def deposit(_,_,_), do: {:error, :wrong_arguments}
 
   @spec withdraw(user :: String.t(), amount :: number, currency :: String.t()) ::
           {:ok, new_balance :: number}
@@ -49,20 +45,33 @@ defmodule ExBanking do
              | :not_enough_money
              | :too_many_requests_to_user}
   def withdraw(user, amount, currency) do
-    case user?(user) do
-      true -> User.withdraw(user, amount, currency)
-      false -> {:error, :user_does_not_exist}
+    with {:not_float_or_int, true} <- {:not_float_or_int, is_float(amount) or is_integer(amount)},
+         {:not_positive_amount, true} <- {:not_positive_amount, amount > 0},
+         {:not_binary_user, true} <- {:not_binary_user, is_binary(user)},
+         {:not_binary_currency, true} <- {:not_binary_currency, is_binary(currency)},
+         {:user_does_not_exist, true} <- {:user_does_not_exist, user?(user)} do
+      User.withdraw(user, amount, currency)
+    else
+      {:not_positive_amount, false} -> {:error, :wrong_arguments}
+      {:not_float_or_int, false} -> {:error, :wrong_arguments}
+      {:not_binary_user, false} -> {:error, :wrong_arguments}
+      {:not_binary_currency, false} -> {:error, :wrong_arguments}
+      {:user_does_not_exist, false} -> {:error, :user_does_not_exist}
     end
-
   end
 
   @spec get_balance(user :: String.t(), currency :: String.t()) ::
           {:ok, balance :: number}
           | {:error, :wrong_arguments | :user_does_not_exist | :too_many_requests_to_user}
   def get_balance(user, currency) do
-    case user?(user) do
-      true -> User.show(user, currency)
-      false -> {:error, :user_does_not_exist}
+    with {:not_binary_user, true} <- {:not_binary_user, is_binary(user)},
+         {:not_binary_currency, true} <- {:not_binary_currency, is_binary(currency)},
+         {:user_does_not_exist, true} <- {:user_does_not_exist, user?(user)} do
+      User.show(user, currency)
+    else
+      {:not_binary_user, false} -> {:error, :wrong_arguments}
+      {:not_binary_currency, false} -> {:error, :wrong_arguments}
+      {:user_does_not_exist, false} -> {:error, :user_does_not_exist}
     end
   end
 
@@ -81,18 +90,36 @@ defmodule ExBanking do
              | :too_many_requests_to_sender
              | :too_many_requests_to_receiver}
   def send(from_user, to_user, amount, currency) do
-    case User.withdraw(from_user, amount, currency) do
-      {:ok, _} ->
-        case User.deposit(to_user, amount, currency) do
-          {:ok, _} ->
-            {:ok, User.show(from_user, currency), User.show(to_user, currency)}
+    with {:not_binary_sender, true} <- {:not_binary_sender, is_binary(from_user)},
+         {:not_binary_receiver, true} <- {:not_binary_receiver, is_binary(to_user)},
+         {:not_binary_currency, true} <- {:not_binary_currency, is_binary(currency)},
+         {:not_fl_int_amount, true} <- {:not_fl_int_amount, is_float(amount) or is_integer(amount)},
+         {:ok, _} <- user?(from_user, :sender),
+         {:ok, _} <- user?(to_user, :receiver),
+         {:too_many_requests_to_sender,{:ok, from}} <- {:too_many_requests_to_sender,User.withdraw(from_user, amount, currency)},
+         {:too_many_requests_to_receiver,{:ok, to}} <- {:too_many_requests_to_receiver,User.deposit(to_user, amount, currency)} do
+      {:ok, from, to}
+    else
+      {:too_many_requests_to_sender,{:error, :too_many_requests_to_user}} -> {:error, :too_many_requests_to_sender}
+      {:too_many_requests_to_receiver,{:error, :too_many_requests_to_user}} -> {:error, :too_many_requests_to_receiver}
+      {:error, :not_enough_money} -> {:error, :not_enough_money}
+      {:not_binary_sender, false} ->
+        {:error, :wrong_arguments}
 
-          error ->
-            error
-        end
+      {:not_binary_receiver, false} ->
+        {:error, :wrong_arguments}
 
-      error ->
-        error
+      {:not_binary_currency, false} ->
+        {:error, :wrong_arguments}
+
+      {:not_fl_int_amount, true} ->
+        {:error, :wrong_arguments}
+
+      {:error, :sender_does_not_exist} ->
+        {:error, :sender_does_not_exist}
+
+      {:error, :receiver_does_not_exist} ->
+        {:error, :receiver_does_not_exist}
     end
   end
 
@@ -100,6 +127,20 @@ defmodule ExBanking do
     case Registry.lookup(ExBanking.Registry, user) do
       [] -> false
       _ -> true
+    end
+  end
+
+  defp user?(user, :sender) when is_binary(user) do
+    case Registry.lookup(ExBanking.Registry, user) do
+      [] -> {:error, :sender_does_not_exist}
+      _ -> {:ok, true}
+    end
+  end
+
+  defp user?(user, :receiver) when is_binary(user) do
+    case Registry.lookup(ExBanking.Registry, user) do
+      [] -> {:error, :receiver_does_not_exist}
+      _ -> {:ok, true}
     end
   end
 end
