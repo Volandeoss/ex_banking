@@ -6,7 +6,7 @@ defmodule ExBanking do
 
   # Done
   @spec create_user(user :: String.t()) :: :ok | {:error, :wrong_arguments | :user_already_exists}
-  def create_user(user) when is_binary(user) do
+  def create_user(user) do
     with {:not_binary_user, true} <- {:not_binary_user, is_binary(user)},
          {:user_already_exists, false} <- {:user_already_exists, user?(user)} do
       User.start_child(user)
