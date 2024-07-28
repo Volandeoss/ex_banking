@@ -45,19 +45,18 @@ defmodule ExBanking.User do
 
   def handle_call({:deposit, amount, currency, user}, _from, state) do
     amount_format =
-      amount + 0.0
+      (amount + 0.0)
       |> Float.round(2)
 
-    new_value = Map.get(state, currency, 0) + amount_format |> Float.round(2)
+    new_value = (Map.get(state, currency, 0) + amount_format) |> Float.round(2)
 
     new_state =
       state
       |> Map.put(currency, new_value)
 
     process_done(user)
-    {:reply, {:ok,  new_value}, new_state}
+    {:reply, {:ok, new_value}, new_state}
   end
-
 
   def handle_call({:show, _currency, user}, _from, state) when state.req >= @max_requests do
     process_done(user)
@@ -77,10 +76,10 @@ defmodule ExBanking.User do
 
   def handle_call({:withdraw, amount, currency, user}, _from, state) do
     amount_format =
-      amount + 0.0
+      (amount + 0.0)
       |> Float.round(2)
 
-    new_value = Map.get(state, currency, 0) - amount_format |> Float.round(2)
+    new_value = (Map.get(state, currency, 0) - amount_format) |> Float.round(2)
 
     if new_value < 0 do
       process_done(user)
